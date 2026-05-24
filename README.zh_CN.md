@@ -1,5 +1,7 @@
 # SPL Fix for OTA
 
+[English](README.md)
+
 `ro.build.version.security_patch` (SPL) 不匹配时，OTA 系统更新会拒绝安装。本模块将
 SPL 临时修改为已下载 OTA 包中的目标值，使更新可以继续。
 

@@ -1,5 +1,7 @@
 # SPL Fix for OTA
 
+[中文版本](README.zh_CN.md)
+
 Patches `ro.build.version.security_patch` to match the pending OTA package so the
 system update can proceed. Works with both **KernelSU** and **Magisk**.
 
