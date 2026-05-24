@@ -1,39 +1,90 @@
 # SPL Fix for OTA
 
-KernelSU / Magisk 模块。将 `ro.build.version.security_patch` 修改为已下载
-OTA 包的目标 SPL，使系统更新可以继续。
+Patches `ro.build.version.security_patch` to match the pending OTA package so the
+system update can proceed. Works with both **KernelSU** and **Magisk**.
 
-来自 `module.prop`：
+## User Guide
 
-> Action-button OTA SPL bypass. Click to fix, no boot impact.
+### When You Need This
 
-## 兼容性
+Rooted devices running incremental OTA updates may fail verification if the
+current SPL doesn't match the update payload. Common causes: custom kernels,
+patched `init_boot`, slot switches, or factory images with different patch
+levels.
 
-同时支持 KernelSU 和 Magisk，运行时自动检测 root 环境。
+### Installation
 
-## 文件
+1. Download `spl_fix-v*.zip` from [Releases](../../releases)
+2. Open KernelSU / Magisk Manager
+3. Modules → Install from storage → select the zip
 
-| 文件            | 用途                                   |
+No reboot required.
+
+### Usage
+
+**Action button (recommended):**
+
+1. Download the OTA update first (Settings → System → System Update → Download)
+2. Tap the module's **action button** in KSU / Magisk Manager
+3. When you see `Patched xxx -> xxx`, proceed with the system update
+
+**Manual:**
+
+```sh
+su -c sh /data/adb/modules/spl_fix/fix.sh
+```
+
+`action.sh` works the same way.
+
+### Uninstall
+
+Remove the module from the manager. The uninstall script restores the original
+SPL.
+
+---
+
+## Project Structure
+
+### Files
+
+| File            | Description                            |
 |-----------------|----------------------------------------|
-| `module.prop`   | 模块元数据                             |
-| `action.sh`     | 操作按钮脚本 — 检测并修改 SPL          |
-| `fix.sh`        | 便捷包装，供手动 `adb shell` / 终端调用|
-| `uninstall.sh`  | 卸载时恢复原始 SPL 值                  |
+| `module.prop`   | Module metadata                        |
+| `action.sh`     | Main logic — detect and patch SPL      |
+| `fix.sh`        | Convenience wrapper for manual invoke  |
+| `uninstall.sh`  | Restores original SPL on removal       |
+| `.gitignore`    | Git ignore rules                       |
+| `.ignore`       | fd/rg ignore rules                     |
 
-## `action.sh` 工作流程
+### How `action.sh` Works
 
-1. 从以下来源提取目标 SPL 日期（按顺序尝试）：
-   - `/data/ota_package/metadata.pb`（扫描 `YYYY-MM-DD` 格式）
-   - `logcat -s update_engine:E`（同上日期格式）
-   - 完整 logcat，搜索 `Target build SPL <date>`
-2. 若未找到 SPL，输出错误信息并退出。
-3. 将找到的 SPL 与当前值比较。
-4. 若不同，保存当前值并应用修改。
+**SPL detection sources (tried in order):**
 
-## 卸载
+1. `/data/ota_package/metadata.pb` — strings scan for `YYYY-MM-DD`
+2. `logcat -s update_engine:E` — same pattern
+3. Full logcat — `Target build SPL <date>` pattern
 
-卸载脚本会恢复保存的原始 SPL 值。
+**Flow:**
 
-## 许可证
+```
+Detect target SPL → Compare with current → Save original → resetprop → Verify
+```
+
+- `--no SPL found--`: prompts user to download the OTA first
+- `--already matching--`: exits with no changes
+- `--mismatch--`: saves current value to `original_spl`, then patches
+- `uninstall.sh` restores from `original_spl` and removes the file
+
+### Environment Detection
+
+Auto-switches based on `$KSU`:
+
+| Variable     | KernelSU                          | Magisk            |
+|-------------|-----------------------------------|-------------------|
+| `$KSU`      | `true`                            | unset             |
+| resetprop   | `/data/adb/ksu/bin/resetprop`     | built-in `resetprop`|
+| description | `ksud module config set`          | unavailable, skip |
+
+## License
 
 [GPL-3.0-or-later](LICENSE) © 2026 MysticalDevil
