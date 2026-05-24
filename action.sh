@@ -65,8 +65,10 @@ if [ "$SPL" = "$CURRENT" ]; then
     exit 0
 fi
 
-# ── Save original SPL for uninstall ──
-echo "$CURRENT" > "$SAVE_FILE"
+# ── Save original SPL for uninstall (only once) ──
+if [ ! -f "$SAVE_FILE" ]; then
+    echo "$CURRENT" > "$SAVE_FILE"
+fi
 
 # ── Apply ──
 $RESETPROP -n ro.build.version.security_patch "$SPL"

@@ -1,89 +1,89 @@
 # SPL Fix for OTA
 
-Patches `ro.build.version.security_patch` to match the pending OTA package so the
-system update can proceed. Works with both **KernelSU** and **Magisk**.
+`ro.build.version.security_patch` (SPL) 不匹配时，OTA 系统更新会拒绝安装。本模块将
+SPL 临时修改为已下载 OTA 包中的目标值，使更新可以继续。
 
-## User Guide
+同时支持 **KernelSU** 和 **Magisk**，运行时自动检测 root 环境。
 
-### When You Need This
+## 用户指南
 
-Rooted devices running incremental OTA updates may fail verification if the
-current SPL doesn't match the update payload. Common causes: custom kernels,
-patched `init_boot`, slot switches, or factory images with different patch
-levels.
+### 什么时候需要
 
-### Installation
+已 root 的设备在执行 OTA 增量更新时，系统会校验当前系统分区的 SPL 是否与更新包一致。
+如果刷入了自定义内核 / 修补了 `init_boot` / 更换了 slot 等，SPL 可能与更新包期望不符，
+导致 OTA 安装失败。
 
-1. Download `spl_fix-v*.zip` from [Releases](../../releases)
-2. Open KernelSU / Magisk Manager
-3. Modules → Install from storage → select the zip
+### 安装
 
-No reboot required.
+1. 从 [Releases](../../releases) 下载 `spl_fix-v*.zip`
+2. 打开 KernelSU / Magisk 管理器
+3. 模块 → 从存储安装 → 选择 zip
 
-### Usage
+无需重启。
 
-**Action button (recommended):**
+### 使用
 
-1. Download the OTA update first (Settings → System → System Update → Download)
-2. Tap the module's **action button** in KSU / Magisk Manager
-3. When you see `Patched xxx -> xxx`, proceed with the system update
+**操作按钮（推荐）：**
 
-**Manual:**
+1. 先下载 OTA 更新包（设置 → 系统 → 系统更新 → 下载更新）
+2. 在 KernelSU / Magisk 管理器中点击本模块的**操作按钮**
+3. 看到 `Patched xxx -> xxx` 即成功，随后可开始系统更新
+
+**手动执行：**
 
 ```sh
 su -c sh /data/adb/modules/spl_fix/fix.sh
 ```
 
-`action.sh` works the same way.
+也可直接调用 `action.sh`，效果相同。
 
-### Uninstall
+### 卸载
 
-Remove the module from the manager. The uninstall script restores the original
-SPL.
+在 KernelSU / Magisk 管理器中移除模块，卸载脚本会自动恢复原始 SPL 值。
 
 ---
 
-## Project Structure
+## 项目结构
 
-### Files
+### 文件
 
-| File            | Description                            |
-|-----------------|----------------------------------------|
-| `module.prop`   | Module metadata                        |
-| `action.sh`     | Main logic — detect and patch SPL      |
-| `fix.sh`        | Convenience wrapper for manual invoke  |
-| `uninstall.sh`  | Restores original SPL on removal       |
-| `.gitignore`    | Git ignore rules                       |
-| `.ignore`       | fd/rg ignore rules                     |
+| 文件            | 说明                                    |
+|-----------------|-----------------------------------------|
+| `module.prop`   | 模块元数据                              |
+| `action.sh`     | 主逻辑 — 检测目标 SPL 并修改系统属性    |
+| `fix.sh`        | 便捷包装，供手动执行                    |
+| `uninstall.sh`  | 卸载时恢复原始 SPL 值                   |
+| `.gitignore`    | Git 忽略规则                            |
+| `.ignore`       | fd/rg 忽略规则                          |
 
-### How `action.sh` Works
+### `action.sh` 工作流程
 
-**SPL detection sources (tried in order):**
+**SPL 来源检测（按顺序）：**
 
-1. `/data/ota_package/metadata.pb` — strings scan for `YYYY-MM-DD`
-2. `logcat -s update_engine:E` — same pattern
-3. Full logcat — `Target build SPL <date>` pattern
+1. `/data/ota_package/metadata.pb` — 扫描 `YYYY-MM-DD` 格式日期
+2. `logcat -s update_engine:E` — 同上格式
+3. 完整 logcat — 搜索 `Target build SPL <date>` 模式
 
-**Flow:**
+**执行流程：**
 
 ```
-Detect target SPL → Compare with current → Save original → resetprop → Verify
+检测目标 SPL → 对比当前值 → 保存原始值 → resetprop 修改 → 验证
 ```
 
-- `--no SPL found--`: prompts user to download the OTA first
-- `--already matching--`: exits with no changes
-- `--mismatch--`: saves current value to `original_spl`, then patches
-- `uninstall.sh` restores from `original_spl` and removes the file
+- 如果 `--未找到 SPL--`：提示先下载 OTA 更新包
+- 如果 `--已匹配--`：无需修改，直接退出
+- 如果 `--不匹配--`：将当前值保存到 `original_spl`，然后修改属性
+- `uninstall.sh` 从 `original_spl` 读取并恢复原始值，之后删除该文件
 
-### Environment Detection
+### 环境兼容
 
-Auto-switches based on `$KSU`:
+通过 `$KSU` 环境变量自动切换：
 
-| Variable     | KernelSU                          | Magisk            |
-|-------------|-----------------------------------|-------------------|
-| `$KSU`      | `true`                            | unset             |
-| resetprop   | `/data/adb/ksu/bin/resetprop`     | built-in `resetprop`|
-| description | `ksud module config set`          | unavailable, skip |
+| 变量        | KernelSU                          | Magisk          |
+|-------------|-----------------------------------|-----------------|
+| `$KSU`      | `true`                            | 未设置          |
+| resetprop   | `/data/adb/ksu/bin/resetprop`     | 内置 `resetprop`|
+| 动态描述    | `ksud module config set`          | 不可用，跳过    |
 
 ## License
 
