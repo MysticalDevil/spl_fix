@@ -1,6 +1,6 @@
 id=spl_fix
 name=SPL Fix for OTA
-version=v3.1
-versionCode=4
+version=v3.2
+versionCode=5
 author=MysticalDevil
 description=Action-button OTA SPL bypass. Click to fix, no boot impact.
